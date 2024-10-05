@@ -1,0 +1,322 @@
+---
+title: "PRACTICAL: COMPARTMENTAL MODELS IN EPIDEMIOLOGY"
+author: "AC Steger"
+output: 
+  html_document:
+    toc: true
+    code_folding: show
+    toc_float: 
+        collapsed: true
+        smooth_scroll: true
+    number_sections: false
+---
+
+```{r setup, include=FALSE}
+
+# set global options for knitr
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+
+# define required packages
+required_packages <- c("deSolve", "dplyr", "lubridate", "tidyr", "plotly", "kableExtra")
+
+# install missing packages
+new_packages <- required_packages[!(required_packages %in% installed.packages()[, "Package"])]
+if (length(new_packages) > 0) {
+  install.packages(new_packages, repos = 'http://cran.us.r-project.org')
+}
+
+# load required libraries
+library(deSolve)    # for solving differential equations
+library(dplyr)      # for data manipulation
+library(lubridate)  # for date handling
+library(tidyr)      # for data manipulation
+library(plotly)     # for data visualization
+library(kableExtra) # for better visual outputs
+```
+
+# INTRO: Compartmental Models Used in Epidemiology
+
+- This R practical is based on the attached presentation "compartmental_models_epidemiology.pptx", which is recommended to review before starting on this practical
+- Both pieces were created in the early days of the COVID-19 outbreak, and as such, they investigate the progression of the pandemic during the fist wave (late February-June 2020)
+- You will find guidance on how to download and inspect epidemiology data from various countries
+- You will try your hands on building your own deterministic SIR model, interpret its results and individual parameters
+- This practical consists of 3 parts and 9 tasks
+
+# PART I: Data Exploration and Visualization (Netherlands)
+
+- First, we will use open-source data from the repository *CoronaWatchNL* (https://github.com/J535D165/CoronaWatchNL)
+- The link takes us to Dutch COVID-19 data, based on RIVM information (National Institute for Public Health and the Environment)
+- Scroll down the site until you see `Geographical datasets`
+- Click on `Newly reported case counts by date in NL` > select `Complete file format` > the CSV dataset appears on a new screen
+- To directly load this type of data into R, click the `Raw` button and use the obtained URL
+
+## Step 1: Load and inspect data
+
+```{r}
+file <- "https://raw.githubusercontent.com/J535D165/CoronaWatchNL/master/data-geo/data-national/RIVM_NL_national.csv"
+covid <- read.csv(file)   # save file under a concise variable name
+head(covid)               # verify file by previewing the first rows
+str(covid)                # inspect the file structure
+```
+
+## Step 2: Transform dataframe
+
+- We have 4 columns in our dataset: `Date`, `Type`, `Number of Cases`, `Cumulative Number of Cases`
+- There are 3 different Types: `Totaal`, `Ziekenhuisopname` (Registered in hospital), `overleden` (deceased)
+- As we want to plot the change in cumulative case numbers over time, we need to extract the `Ziekenhuisopname` column
+- For simplicity sake, we will limit the scope of our exploration to the data of the first wave
+
+```{r}
+covid_hospitalized <- covid %>% 
+  filter(Type == 'Ziekenhuisopname') %>%      # filter for hospital registration
+  mutate(Datum = ymd(Datum))  %>%             # transform date format with lubridate for simple filtering
+  filter(Datum <= as.Date("2020-06-30"))      # filter out instances until the end of June 2020
+```
+
+```{r}
+# print the dataframe and control displayed size
+covid_hospitalized %>%
+  kable() %>%
+  kable_styling() %>%
+  scroll_box(width = "100%", height = "300px")
+```
+
+## Step 3: Plot RIVM data for Netherlands (2020)
+
+```{r}
+# draw the plot
+plot_ly(covid_hospitalized, 
+        x = ~Datum, 
+        y = ~AantalCumulatief, 
+        type = 'bar', 
+        marker = list(color = 'tomato')) %>%
+  layout(title = "Cumulative Number of Hospitalized Patients Due to COVID-19",
+         xaxis = list(title = "Days Since Start",
+                      tickangle = 65,
+                      showgrid = TRUE,
+                      zeroline = FALSE),
+         yaxis = list(title = "Cumulative Number of Cases",
+                      showgrid = TRUE,
+                      zeroline = FALSE),
+         annotations = list(
+             text = "Source: RIVM",
+             xref = "paper", yref = "paper",
+             x = 0, y = -0.2,
+             showarrow = FALSE,
+             font = list(size = 12)
+           )
+  )
+```
+
+*Figure 1: * Bar chart depicting the growth of cumulative COVID-19 case numbers in the Netherlands during the first wave.
+
+## Task 1: Load the CSV file and save it under an informative variable name
+
+- Now it is your turn to download, inspect and plot another dataset according to what you learned above
+- The dataset can be found in the same repository, it is called 'Newly reported case counts by date in NL per province'
+
+```{r}
+# YOUR ANSWER HERE
+```
+
+## Task 2: Inspect the dataset and extract data for hospitalized people. Save it under an informative variable name
+
+```{r}
+# YOUR ANSWER HERE
+```
+
+## Task 3: Think of a suitable plot type that can depict the differences between all the provinces and plot both of them
+
+```{r}
+# YOUR ANSWER HERE
+```
+
+## Task 4: Summarise your findings through this exploratory investigation as to what we learned about the COVID-19 situation in the individual provinces (e.g. which provinces were struck the hardest)?
+
+```{r}
+# YOUR ANSWER HERE
+```
+
+# PART II: Data Exploration and Visualization (global)
+
+- Now that we are familiar with the basic data analytical procedures, let us open towards global data 
+- We will download and inspect the international dataset from the EU Open Data Portal
+- Choose a country that starts with the **same letter as your family name**. My family name starts with an S, so I will pick `Spain`:
+
+## Step 1: Load and inspect data
+
+```{r}
+# as shown in Step 1
+link3 <- "https://opendata.ecdc.europa.eu/covid19/casedistribution/csv"
+global <- read.csv(link3)
+
+# in case link is broken
+# global_copy <- read.csv("/Users/akossteger/covid_final.csv")
+# str(global_copy)
+```
+
+## Step 2: Transform data
+
+```{r}
+dat <- global[c(1, 5, 7)]                               # select columns 'dateRep', 'cases' and 'countriesAndTerritories'
+spain_dat = dat %>% 
+  filter(countriesAndTerritories == 'Spain') %>%          # filter for Spain
+  mutate(dateRep = dmy(dateRep)) %>%                      # transform date format with lubridate
+  filter(dateRep <= as.Date("2020-06-30")) %>%            # filter out instances until the end of June 2020
+  arrange(dateRep)                                        # sort dates in ascending order
+```
+
+
+```{r}  
+# print the data
+spain_dat %>%
+  kable() %>%
+  kable_styling() %>%
+  scroll_box(width = "100%", height = "300px")
+```
+
+## Step 3: Plot Spain data
+
+```{r}
+# draw the plot
+plot_ly(spain_dat, 
+        x = ~dateRep, 
+        y = ~cases, 
+        type = 'bar', 
+        marker = list(color = 'tomato',
+                      line = list(color = 'tomato', width = 1.5))) %>%
+        layout(title = "Daily New Cases in Spain",
+            xaxis = list(
+            title = "Date",
+            tickangle = 65,
+            tickformat = "%b %d", # format the dates to show month and day
+            showgrid = TRUE,
+            zeroline = FALSE
+         ),
+         yaxis = list(
+           title = "Number of Cases",
+           showgrid = TRUE,
+           zeroline = FALSE
+         ),
+         annotations = list(
+           list(
+            text = "Source: ECDC",
+            xref = "paper", yref = "paper",
+            x = 0, y = -0.15,
+            showarrow = FALSE,
+            font = list(size = 12)
+           )
+         ))
+```
+
+*Figure 3: * Bar chart depicting the change in daily COVID-19 case numbers in Spain over the first wave.
+
+## Task 5: Pick your country, investigate and plot
+
+```{r}
+# this part is entirely free to decide for the solver of this practical. For a concrete example, consult PART II.
+```
+
+# PART III: Building an SIR Model
+
+- This part is largely inspired by Dr. Aidan Findlater’s great blog post with minor adaptations for clarity (https://archives.aidanfindlater.com/blog/2010/04/20/the-basic-sir-model-in-r/)
+- Steps 1-3 demonstrate the theoretical foundation of how the model is constructed, therefore note that the parameters used are purely hypothetical 
+- The tasks below contain practical instructions to allow interaction with the model, extending the original work into a hands-on exercise
+
+## Step 1: Define the SIR model
+
+We have to represent the SIR model as a function that takes the following parameters:
+
+- `time`: represents the current time
+- `state`: a vector containing the current numbers of the S, I, and R compartments (Susceptible, Infected, Recovered)
+- `parameters`: a list containing the beta (transmission rate) and gamma (recovery rate) params
+
+```{r}
+# define SIR model
+sir_model <- function(time, state, parameters) {          
+  with(as.list(c(state, parameters)), {           # with() allows easier access to individual elements w/o referencing the list
+    dSdt <- -beta * S * I                         # calculate rate of change of the Susceptible population
+    dIdt <- beta * S * I - gamma * I              # calculate rate of change of the Infected population
+    dRdt <- gamma * I                             # calculate rate of change of the Recovered population
+    return(list(c(dSdt, dIdt, dRdt)))             # return values of S, I and R as a list
+  })
+}
+```
+
+## Step 2: Set initial parameters and run the model
+
+```{r}
+##############################################################################################################
+# β = transmission rate: average number of susceptible individuals infected by an infected individual   #####
+# γ = recovery rate (1/duration)                                                                        #####
+##############################################################################################################
+
+initial <- c(S = 1-1e-6, I = 1e-6, R = 0)         # define compartments as proportions of the population
+parameters <- c(beta = 1.4247, gamma = 0.14286)   # use Findlater's hypothetical parameters for demonstrative purposes
+times <- seq(0, 70, by = 1)                       # define simulation length in 70 days
+
+# run the model
+out <- as.data.frame(ode(y = initial, times = times, func = sir_model, parms = parameters))
+
+# reshape the data from wide to long format
+out_long <- out %>%
+  pivot_longer(cols = c(S, I, R),
+               names_to = "Compartment", 
+               values_to = "Proportion")
+```
+
+## Step 3: Plot the model
+
+```{r}
+# draw the plot
+plot_ly(out_long, 
+        x = ~seq_along(Proportion), 
+        y = ~Proportion, 
+        color = ~Compartment, 
+        type = 'scatter', 
+        mode = 'lines') %>%
+  layout(title = "SIR Model Simulation",
+         xaxis = list(title = "Time (days)"),
+         yaxis = list(title = "Population Proportion"),
+         legend = list(title = list(text = "Compartment")))
+```
+
+*Figure 4: * SIR Model depicting disease dynamics at $\beta$ = 1.4247,  $\gamma$ = 0.14286, and initial infected ratio of $10^-6$. In light of this figure we can expect the outbreak to plateau on day 41 with ~66% of the population being infected, and on day 50 the proportion of recovered population exceeds that of the infected one.
+
+## Task 6: Familiarize yourself with the model. 
+
+- Try changing the parameters: what if you set beta or gamma higher, or use a higher initial infected ratio? 
+- You do not have to report on this part, because it is meant for your exploration only
+
+## Task 7: Given the above parameters, what is the R0 value of the above disease and what does this mean?
+
+```{r}
+# YOUR ANSWER HERE
+```
+
+## Task 8: Simulate the progression of the first wave of COVID-19 using parameters derived from the data of the country of your choice
+
+- Replicate steps 1-3 using data of your selected country. Your task will be complex here: 
+
+  - Look up the relevant parameters of the COVID-19 disease online. You need the *average duration of the disease* and R0 value (or *basic reproduction number*)
+  - Given these two, you will be able to calculate the *gamma* and *beta* parameters (do save these four parameters as variables)
+  - Create a new 'initial' vector from the dataset of your selected country (NB: you have to give the proportion of infected vs. healthy population on the first day of interest. As an arbitrary cut-off point, you may take the number of infections on the 1st March 2020) 
+  - Investigate these and given the population of the country (you can check on Worldbank) you can calculate the relative proportions between susceptible and infected population. When you are done, run the model and look at the graph
+  - You can use averages and approximations
+
+```{r}
+# YOUR ANSWER HERE
+```
+
+## Task 9: What are the limitations of this SIR model?
+
+```{r}
+# YOUR ANSWER HERE
+```
+
+Well done for making it so far. I hope you enjoyed the presentation and the practical.
+
+# END OF PRACTICAL
+
