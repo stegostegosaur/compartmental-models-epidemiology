@@ -1,5 +1,5 @@
 🧬 Compartmental Models in Epidemiology
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE) 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Explore and simulate classic epidemiological models like SIR using R. This repository provides practical examples and visualizations to aid understanding of disease dynamics.
 
