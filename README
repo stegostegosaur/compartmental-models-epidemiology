@@ -1,1 +1,40 @@
-Initial commit
+🧬 Compartmental Models in Epidemiology
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE) 
+
+Explore and simulate classic epidemiological models like SIR using R. This repository provides practical examples and visualizations to aid understanding of disease dynamics.
+
+📂 Contents
+
+    `sir_practical.Rmd`: R Markdown file containing the practical exercise.
+
+    `sir_practical_solution.html`: Rendered HTML solution for the practical.
+
+    `compartmental_models_epidemiology.pdf`: PDF version of the presentation covering theoretical aspects.
+
+🚀 Getting Started
+
+    Clone the Repository: `git clone https://github.com/stegostegosaur/compartmental-models-epidemiology.git`
+
+    Open in RStudio: Open sir_practical.Rmd in RStudio to explore and run the simulations.
+
+    View the Presentation: Open compartmental_models_epidemiology.pdf to review the theoretical background.
+
+📊 Preview
+
+Figure: Simulation of the SIR model showing the dynamics of susceptible, infected, and recovered populations over time.
+
+🧠 Learning Objectives
+
+    Understand the structure and assumptions of compartmental models.
+
+    Simulate disease spread using R.
+
+    Interpret the impact of parameters on disease dynamics.
+
+📄 License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
+
+Feel free to customize the README further to suit your project's needs.
+
+If you need assistance with embedding slide images or further customizing your README, feel free to reach out to me!
